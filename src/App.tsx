@@ -4,13 +4,25 @@ import { LandingPage } from './components/LandingPage';
 import { AuditRequestForm } from './components/AuditRequestForm';
 import { AuditProcessor } from './components/AuditProcessor';
 import { AuditReport } from './components/AuditReport';
+import { ComponentShowcase } from './components/ComponentShowcase';
 
 type AppState = 'landing' | 'form' | 'processing' | 'report';
 
 function App() {
+  const isShowcase = (() => {
+    if (typeof window === 'undefined') return false;
+    const path = window.location.pathname.toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    return path.includes('showcase') || params.has('showcase');
+  })();
+
   const [appState, setAppState] = useState<AppState>('landing');
   const [requestId, setRequestId] = useState<string>('');
   const [reportId, setReportId] = useState<string>('');
+
+  if (isShowcase) {
+    return <ComponentShowcase />;
+  }
 
   useEffect(() => {
     document.title = appState === 'landing'

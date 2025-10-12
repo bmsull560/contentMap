@@ -5,21 +5,55 @@ import { CheckCircle, Clock, FileText, TrendingUp } from 'lucide-react';
 interface AuditProcessorProps {
   requestId: string;
   onViewReport: (reportId: string) => void;
+  demoMode?: boolean;
+  demoReportId?: string;
 }
 
-export function AuditProcessor({ requestId, onViewReport }: AuditProcessorProps) {
+export function AuditProcessor({ requestId, onViewReport, demoMode = false, demoReportId }: AuditProcessorProps) {
   const [status, setStatus] = useState<'processing' | 'completed'>('processing');
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState('Initializing audit...');
   const [reportId, setReportId] = useState<string>('');
 
   useEffect(() => {
+    if (demoMode) {
+      runDemoProcess();
+      return;
+    }
+
     if (requestId) {
       processAudit();
     }
-  }, [requestId]);
+  }, [requestId, demoMode]);
+
+  const runDemoProcess = async () => {
+    const demoSteps = [
+      { step: 'Fetching website information...', progress: 10 },
+      { step: 'Crawling website pages...', progress: 30 },
+      { step: 'Analyzing content quality...', progress: 55 },
+      { step: 'Mapping to buyer journey...', progress: 75 },
+      { step: 'Generating AI-powered recommendations...', progress: 90 }
+    ];
+
+    for (const item of demoSteps) {
+      setCurrentStep(item.step);
+      setProgress(item.progress);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    setCurrentStep('Audit complete!');
+    setProgress(100);
+    setStatus('completed');
+    const resultingId = demoReportId ?? 'demo-report';
+    setReportId(resultingId);
+    await new Promise(resolve => setTimeout(resolve, 400));
+    onViewReport(resultingId);
+  };
 
   const processAudit = async () => {
+    if (demoMode) {
+      return;
+    }
     try {
       setCurrentStep('Fetching website information...');
       setProgress(10);

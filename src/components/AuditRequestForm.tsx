@@ -5,9 +5,10 @@ import { Building2, Mail, User, Globe, Briefcase, CheckCircle, ArrowLeft } from 
 interface AuditRequestFormProps {
   onBack: () => void;
   onSuccess: (requestId: string) => void;
+  demoMode?: boolean;
 }
 
-export function AuditRequestForm({ onBack, onSuccess }: AuditRequestFormProps) {
+export function AuditRequestForm({ onBack, onSuccess, demoMode = false }: AuditRequestFormProps) {
   const [formData, setFormData] = useState({
     companyName: '',
     websiteUrl: '',
@@ -69,6 +70,14 @@ export function AuditRequestForm({ onBack, onSuccess }: AuditRequestFormProps) {
     setSubmitting(true);
 
     try {
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      if (demoMode) {
+        onSuccess('demo-request');
+        setSubmitting(false);
+        return;
+      }
+
       let websiteUrl = formData.websiteUrl.trim();
       if (!websiteUrl.startsWith('http://') && !websiteUrl.startsWith('https://')) {
         websiteUrl = 'https://' + websiteUrl;

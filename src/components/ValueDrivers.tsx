@@ -11,18 +11,12 @@ interface ValueDriver {
   created_at: string;
 }
 
-interface Product {
-  id: string;
-  name: string;
-}
-
 interface ValueDriversProps {
   companyId: string;
 }
 
 export function ValueDrivers({ companyId }: ValueDriversProps) {
   const [valueDrivers, setValueDrivers] = useState<ValueDriver[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -39,23 +33,15 @@ export function ValueDrivers({ companyId }: ValueDriversProps) {
 
   const fetchData = async () => {
     try {
-      const [driversResult, productsResult] = await Promise.all([
-        supabase
-          .from('value_drivers')
-          .select('*')
-          .eq('company_id', companyId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('products')
-          .select('id, name')
-          .eq('company_id', companyId)
-      ]);
+      const { data, error } = await supabase
+        .from('value_drivers')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
 
-      if (driversResult.error) throw driversResult.error;
-      if (productsResult.error) throw productsResult.error;
+      if (error) throw error;
 
-      setValueDrivers(driversResult.data || []);
-      setProducts(productsResult.data || []);
+      setValueDrivers(data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {

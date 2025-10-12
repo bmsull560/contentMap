@@ -76,7 +76,12 @@ export function BuyerJourneyMap({ companyId }: BuyerJourneyMapProps) {
         };
       });
 
-      (data || []).forEach(item => {
+      const items = (data || []) as Array<{
+        buyer_stage: string;
+        content_type: string;
+      }>;
+
+      items.forEach(item => {
         const stage = item.buyer_stage;
         if (distribution[stage]) {
           distribution[stage].count++;

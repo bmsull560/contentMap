@@ -12,16 +12,28 @@ interface AuditData {
 
 interface ContentAuditProps {
   companyId: string;
+  initialData?: AuditData;
+  demoMode?: boolean;
 }
 
-export function ContentAudit({ companyId }: ContentAuditProps) {
+export function ContentAudit({ companyId, initialData, demoMode = false }: ContentAuditProps) {
   const [auditData, setAuditData] = useState<AuditData | null>(null);
   const [loading, setLoading] = useState(true);
   const [runningAudit, setRunningAudit] = useState(false);
 
   useEffect(() => {
-    fetchLatestAudit();
-  }, [companyId]);
+    if (initialData) {
+      setAuditData(initialData);
+      setLoading(false);
+      return;
+    }
+
+    if (!demoMode) {
+      fetchLatestAudit();
+    } else {
+      setLoading(false);
+    }
+  }, [companyId, initialData, demoMode]);
 
   const fetchLatestAudit = async () => {
     try {
@@ -54,6 +66,26 @@ export function ContentAudit({ companyId }: ContentAuditProps) {
   const runContentAudit = async () => {
     setRunningAudit(true);
     try {
+      if (demoMode) {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        const demoResult: AuditData = initialData ?? {
+          total_content_count: 12,
+          by_stage: { awareness: 5, consideration: 4, decision: 3 },
+          by_type: { blog: 4, case_study: 3, white_paper: 2, video: 1, webinar: 2 },
+          gaps_identified: [
+            {
+              area: 'Decision Stage Content',
+              severity: 'medium',
+              recommendation: 'Add ROI calculators and customer onboarding guides'
+            }
+          ],
+          consistency_score: 78
+        };
+        setAuditData(demoResult);
+        setRunningAudit(false);
+        return;
+      }
+
       const { data: contentData, error: contentError } = await supabase
         .from('content_items')
         .select('buyer_stage, content_type, status')
@@ -63,7 +95,13 @@ export function ContentAudit({ companyId }: ContentAuditProps) {
 
       const byStage: Record<string, number> = {};
       const byType: Record<string, number> = {};
-      const approved = contentData?.filter(c => c.status === 'approved') || [];
+      const contentItems = (contentData || []) as Array<{
+        buyer_stage: string;
+        content_type: string;
+        status: string;
+      }>;
+
+      const approved = contentItems.filter(c => c.status === 'approved');
 
       approved.forEach(item => {
         byStage[item.buyer_stage] = (byStage[item.buyer_stage] || 0) + 1;

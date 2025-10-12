@@ -15,6 +15,8 @@ import {
 interface AuditReportProps {
   reportId: string;
   onBack: () => void;
+  initialReport?: Report;
+  demoMode?: boolean;
 }
 
 interface Report {
@@ -50,15 +52,27 @@ interface Report {
   };
 }
 
-export function AuditReport({ reportId, onBack }: AuditReportProps) {
-  const [report, setReport] = useState<Report | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AuditReport({ reportId, onBack, initialReport, demoMode = false }: AuditReportProps) {
+  const [report, setReport] = useState<Report | null>(initialReport ?? null);
+  const [loading, setLoading] = useState(!initialReport);
 
   useEffect(() => {
-    fetchReport();
-  }, [reportId]);
+    if (initialReport) {
+      setLoading(false);
+      return;
+    }
+
+    if (!demoMode) {
+      fetchReport();
+    } else {
+      setLoading(false);
+    }
+  }, [reportId, initialReport, demoMode]);
 
   const fetchReport = async () => {
+    if (demoMode) {
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('audit_reports')

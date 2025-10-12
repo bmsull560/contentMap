@@ -17,6 +17,7 @@ interface ContentItem {
   description: string;
   buyer_stage: string;
   file_url: string;
+  tags?: string[];
 }
 
 interface Recommendation {
@@ -27,20 +28,40 @@ interface Recommendation {
 
 interface ContentRecommendationsProps {
   companyId: string;
+  initialProspects?: Prospect[];
+  initialRecommendations?: Recommendation[];
+  demoMode?: boolean;
 }
 
-export function ContentRecommendations({ companyId }: ContentRecommendationsProps) {
-  const [prospects, setProspects] = useState<Prospect[]>([]);
-  const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [loading, setLoading] = useState(true);
+export function ContentRecommendations({
+  companyId,
+  initialProspects,
+  initialRecommendations,
+  demoMode = false
+}: ContentRecommendationsProps) {
+  const [prospects, setProspects] = useState<Prospect[]>(initialProspects ?? []);
+  const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(initialProspects?.[0] ?? null);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>(initialRecommendations ?? []);
+  const [loading, setLoading] = useState(!initialProspects);
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
-    fetchProspects();
-  }, [companyId]);
+    if (initialProspects) {
+      setLoading(false);
+      return;
+    }
+
+    if (!demoMode) {
+      fetchProspects();
+    } else {
+      setLoading(false);
+    }
+  }, [companyId, initialProspects, demoMode]);
 
   const fetchProspects = async () => {
+    if (demoMode) {
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('prospects')
@@ -62,6 +83,40 @@ export function ContentRecommendations({ companyId }: ContentRecommendationsProp
     setSelectedProspect(prospect);
 
     try {
+      if (demoMode) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const demoRecommendations: Recommendation[] = initialRecommendations ?? [
+          {
+            content: {
+              id: 'demo-1',
+              title: 'Case Study: Scaling Revenue with ABM',
+              content_type: 'case_study',
+              description: 'Deep-dive case study showing 35% pipeline growth in 90 days.',
+              buyer_stage: 'consideration',
+              file_url: '#',
+              tags: ['technology', 'abm']
+            } as ContentItem,
+            relevance_score: 0.86,
+            reasoning: 'Matches consideration buyer stage. Social proof relevant for SaaS prospects.'
+          },
+          {
+            content: {
+              id: 'demo-2',
+              title: 'ROI Calculator Template',
+              content_type: 'calculator',
+              description: 'Interactive spreadsheet to project ROI from implementing your platform.',
+              buyer_stage: 'decision',
+              file_url: '#',
+              tags: ['finance']
+            } as ContentItem,
+            relevance_score: 0.78,
+            reasoning: 'Decision-stage asset focused on ROI. Complements procurement discussions.'
+          }
+        ];
+        setRecommendations(demoRecommendations);
+        return;
+      }
+
       const { data: contentItems, error: contentError } = await supabase
         .from('content_items')
         .select('*')
@@ -70,9 +125,10 @@ export function ContentRecommendations({ companyId }: ContentRecommendationsProp
 
       if (contentError) throw contentError;
 
-      const recommendedContent: Recommendation[] = [];
+  const recommendedContent: Recommendation[] = [];
+  const items = (contentItems || []) as Array<ContentItem & { tags?: string[] }>;
 
-      (contentItems || []).forEach(item => {
+  items.forEach(item => {
         let relevanceScore = 0;
         const reasons: string[] = [];
 
@@ -243,7 +299,7 @@ export function ContentRecommendations({ companyId }: ContentRecommendationsProp
                 </div>
 
                 <div className="space-y-4">
-                  {recommendations.map((rec, index) => (
+                  {recommendations.map(rec => (
                     <div key={rec.content.id} className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
                       <div className="flex items-start gap-4">
                         <div className="flex-shrink-0">

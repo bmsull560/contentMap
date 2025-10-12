@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, Filter, Tag, FileText, ExternalLink } from 'lucide-react';
+import { Plus, Search, Tag, FileText, ExternalLink } from 'lucide-react';
 
 interface ContentItem {
   id: string;
@@ -16,19 +16,31 @@ interface ContentItem {
 
 interface ContentLibraryProps {
   companyId: string;
+  initialItems?: ContentItem[];
+  demoMode?: boolean;
 }
 
-export function ContentLibrary({ companyId }: ContentLibraryProps) {
+export function ContentLibrary({ companyId, initialItems, demoMode = false }: ContentLibraryProps) {
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStage, setFilterStage] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [, setShowAddModal] = useState(false);
 
   useEffect(() => {
-    fetchContentItems();
-  }, [companyId]);
+    if (initialItems) {
+      setContentItems(initialItems);
+      setLoading(false);
+      return;
+    }
+
+    if (!demoMode) {
+      fetchContentItems();
+    } else {
+      setLoading(false);
+    }
+  }, [companyId, initialItems, demoMode]);
 
   const fetchContentItems = async () => {
     try {
