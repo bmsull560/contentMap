@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contentmap-production
+  labels:
+    name: contentmap-production
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contentmap-staging
+  labels:
+    name: contentmap-staging
+    environment: staging
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: contentmap-app
+  namespace: contentmap-production
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/contentmap-production-app-role"

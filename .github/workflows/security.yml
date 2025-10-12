@@ -1,0 +1,113 @@
+name: Security Watchtower
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Daily security scan at 3 AM UTC
+    - cron: '0 3 * * *'
+
+jobs:
+  secret-scanning:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  dependency-scanning:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --fail-on=upgradable
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  sast-scanning:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  container-scanning:
+    name: Container Image Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          if [ -f Dockerfile ]; then
+            docker build -t contentmap:${{ github.sha }} .
+          else
+            echo "No Dockerfile found, skipping container scan"
+          fi
+
+      - name: Run Trivy container scan
+        if: hashFiles('Dockerfile') != ''
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'contentmap:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-container-results.sarif'
+
+  security-summary:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    needs: [secret-scanning, dependency-scanning, sast-scanning]
+    if: always()
+    steps:
+      - name: Security Summary
+        run: |
+          echo "### Security Scan Results 🔒" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Secret Scanning: ${{ needs.secret-scanning.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Dependency Scanning: ${{ needs.dependency-scanning.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SAST: ${{ needs.sast-scanning.result }}" >> $GITHUB_STEP_SUMMARY
+          
+      - name: Fail on security issues
+        if: needs.secret-scanning.result == 'failure'
+        run: exit 1

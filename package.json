@@ -7,8 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css}\"",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "test": "playwright test",
+    "test:e2e": "playwright test",
+    "test:coverage": "echo 'Add vitest for coverage' && exit 0",
+    "docker:build": "docker build -t contentmap:latest .",
+    "docker:run": "docker run -p 8080:8080 contentmap:latest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

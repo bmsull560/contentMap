@@ -1,0 +1,21 @@
+# Gitleaks Configuration
+title = "Gitleaks config for contentMap"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist for known false positives"
+regexes = [
+  '''EXAMPLE_.*''',
+  '''DEMO_.*''',
+]
+
+paths = [
+  '''\.github/workflows/.*\.yml''',
+  '''README\.md''',
+  '''SETUP_REPORT\.md''',
+]
+
+[allowlist.commits]
+# Add commit SHAs that are known to be safe but flagged

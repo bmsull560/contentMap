@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  contentmap-overview.json: |
+    {
+      "dashboard": {
+        "title": "ContentMap - Application Overview",
+        "tags": ["contentmap", "production"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{namespace=\"contentmap-production\"}[5m])",
+                "legendFormat": "{{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "title": "Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{namespace=\"contentmap-production\",status=~\"5..\"}[5m])",
+                "legendFormat": "5xx - {{pod}}"
+              },
+              {
+                "expr": "rate(http_requests_total{namespace=\"contentmap-production\",status=~\"4..\"}[5m])",
+                "legendFormat": "4xx - {{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "title": "Response Time (p95)",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace=\"contentmap-production\"}[5m]))",
+                "legendFormat": "p95 - {{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "title": "Pod Count",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "count(kube_pod_info{namespace=\"contentmap-production\",pod=~\"contentmap-app-.*\"})"
+              }
+            ],
+            "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8}
+          },
+          {
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "container_memory_usage_bytes{namespace=\"contentmap-production\",pod=~\"contentmap-app-.*\"}",
+                "legendFormat": "{{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "title": "CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{namespace=\"contentmap-production\",pod=~\"contentmap-app-.*\"}[5m])",
+                "legendFormat": "{{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          }
+        ],
+        "refresh": "10s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: false
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+        editable: false

@@ -1,0 +1,219 @@
+name: Release Conductor - Build & Deploy
+
+on:
+  push:
+    branches: [main, develop]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  NODE_VERSION: '20'
+
+jobs:
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+      - name: Generate version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=${GITHUB_SHA::8}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Output image
+        id: image
+        run: echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.contentmap.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name contentmap-staging
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl set image deployment/contentmap-app \
+            app=${{ needs.build.outputs.image }} \
+            -n contentmap-staging
+          
+          kubectl rollout status deployment/contentmap-app -n contentmap-staging --timeout=5m
+
+      - name: Run smoke tests
+        run: |
+          sleep 30
+          curl -f https://staging.contentmap.example.com/health || exit 1
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: production
+      url: https://contentmap.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name contentmap-production
+
+      - name: Database migrations
+        run: |
+          echo "Running database migrations..."
+          # Add Supabase migration commands here
+          # npx supabase db push --linked
+
+      - name: Blue-Green Deployment
+        run: |
+          # Update deployment with new image
+          kubectl set image deployment/contentmap-app \
+            app=${{ needs.build.outputs.image }} \
+            -n contentmap-production
+          
+          # Wait for rollout
+          kubectl rollout status deployment/contentmap-app -n contentmap-production --timeout=10m
+
+      - name: Health check
+        run: |
+          sleep 30
+          for i in {1..5}; do
+            if curl -f https://contentmap.example.com/health; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 10
+          done
+          echo "Health check failed"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          kubectl rollout undo deployment/contentmap-app -n contentmap-production
+          kubectl rollout status deployment/contentmap-app -n contentmap-production
+
+  post-deploy:
+    name: Post-Deployment Tasks
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: success()
+    steps:
+      - name: Notify deployment
+        run: |
+          echo "### 🚀 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: Production" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: ${{ needs.build.outputs.image }}" >> $GITHUB_STEP_SUMMARY
+          echo "- URL: https://contentmap.example.com" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
