@@ -60,13 +60,13 @@ The component showcase is useful for:
 
 ### Demo Data
 
-Demo data is defined in `ComponentShowcase.tsx`:
+Demo data is defined in `ComponentShowcase.tsx` (lines 11-165):
 - `demoCompanyId`: Mock company identifier
-- `demoAuditData`: Mock audit analytics
-- `demoReport`: Mock audit report
-- `demoContentItems`: Mock content library items
-- `demoProspects`: Mock prospect data
-- `demoRecommendations`: Mock content recommendations
+- `demoAuditData`: Mock audit analytics (lines 13-30)
+- `demoReport`: Mock audit report (lines 32-82)
+- `demoContentItems`: Mock content library items (lines 84-111)
+- `demoProspects`: Mock prospect data (lines 113-136)
+- `demoRecommendations`: Mock content recommendations (lines 138-165)
 
 ### Adding New Components
 
@@ -94,10 +94,16 @@ Tests for the showcase are located in `/tests/smoke.spec.ts`:
 
 ```bash
 # Run all tests
-npx playwright test
+npm test
 
 # Run showcase-specific tests
-npx playwright test --grep "showcase"
+npm test -- --grep "showcase"
+
+# Run tests in headed mode
+npm run test:headed
+
+# Run tests with UI mode
+npm run test:ui
 ```
 
 ## Styling

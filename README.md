@@ -14,7 +14,7 @@ A React + TypeScript web application for content mapping and audit analysis. Bui
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js (v16 or higher recommended)
 - npm
 
 ### Installation
@@ -91,18 +91,24 @@ tests/
 - `npm run preview` - Preview production build
 - `npm run typecheck` - Run TypeScript type checking
 - `npm run lint` - Run ESLint
+- `npm test` - Run Playwright tests
+- `npm run test:headed` - Run tests in headed mode
+- `npm run test:ui` - Run tests with UI mode
 
 ## Testing
 
 ```bash
-# Install Playwright browsers
+# Install Playwright browsers (first time only)
 npx playwright install
 
 # Run tests
-npx playwright test
+npm test
 
 # Run tests in headed mode
-npx playwright test --headed
+npm run test:headed
+
+# Run tests with UI mode
+npm run test:ui
 ```
 
 ## Technologies
